@@ -1,0 +1,65 @@
+# Install once with:  uv run pre-commit install
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-toml
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Local hooks run through `uv run`, so they always use the tools pinned in
+  # uv.lock, whether or not the virtual environment is activated.
+  - repo: local
+    hooks:
+      - id: no-escape-hatches
+        name: ban type-ignore and noqa comments
+        language: pygrep
+        entry: '#\s*(type:\s*ignore|noqa)'
+        types: [python]
+        files: ^(src|tests|scripts)/
+
+      - id: uv-lock-check
+        name: uv.lock is up to date
+        language: system
+        entry: uv lock --check
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: uv run ruff check
+        types: [python]
+
+      - id: ruff-format
+        name: ruff format
+        language: system
+        entry: uv run ruff format
+        types: [python]
+
+      - id: mypy
+        name: mypy (strict)
+        language: system
+        entry: uv run mypy src/
+        pass_filenames: false
+        types: [python]
+
+      - id: import-linter
+        name: import boundaries
+        language: system
+        entry: uv run lint-imports
+        pass_filenames: false
+        types: [python]
+
+      - id: pytest
+        name: pytest
+        language: system
+        entry: uv run pytest
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
