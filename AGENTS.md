@@ -1,4 +1,4 @@
-# AI Agent Guidelines (`agent.md`)
+# AI Agent Guidelines (`AGENTS.md`)
 
 ## Project Overview
 
