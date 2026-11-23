@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 
@@ -83,8 +85,114 @@ async def test_advise_cities_keeps_successes_when_some_cities_fail() -> None:
         results = await advise_cities(client, ["Dubai", "Missing", "Offline"])
 
     assert results[0].advisory is not None
+    assert results[0].city == "Dubai"
+    assert results[0].advisory.risk is RiskLevel.LOW
     assert results[1].error == "City not found: Missing"
     assert results[2].error == "Weather service request failed"
+
+
+def test_city_result_requires_exactly_one_outcome() -> None:
+    advisory = Advisory(city="Dubai", risk=RiskLevel.LOW, reasons=[])
+
+    with pytest.raises(ValueError, match="Exactly one"):
+        CityResult(city="Dubai")
+    with pytest.raises(ValueError, match="Exactly one"):
+        CityResult(city="Dubai", advisory=advisory, error="Unavailable")
+
+    assert CityResult(city="Dubai", advisory=advisory).advisory is advisory
+    assert CityResult(city="Dubai", error="Unavailable").error == "Unavailable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["status", "timeout", "missing_current"])
+async def test_forecast_failures_do_not_stop_other_cities(failure: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "geocoding-api.open-meteo.com":
+            city = request.url.params["name"]
+            latitude = 1 if city == "Failing" else 2
+            return httpx.Response(
+                200,
+                json={
+                    "results": [{"name": city, "latitude": latitude, "longitude": 1}]
+                },
+            )
+        if (
+            request.url.host == "api.open-meteo.com"
+            and request.url.params["latitude"] == "1.0"
+        ):
+            if failure == "status":
+                return httpx.Response(500, request=request)
+            if failure == "timeout":
+                raise httpx.ConnectTimeout("Timed out", request=request)
+            return httpx.Response(200, json={})
+        return httpx.Response(
+            200,
+            json={
+                "current": {
+                    "temperature_2m": 20,
+                    "wind_speed_10m": 10,
+                    "wind_gusts_10m": 10,
+                    "precipitation": 0,
+                    "weather_code": 3,
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        results = await advise_cities(client, ["Failing", "Working"])
+
+    assert results[0].advisory is None
+    assert results[0].error is not None
+    assert results[1].advisory is not None
+    assert results[1].error is None
+
+
+@pytest.mark.asyncio
+async def test_advise_cities_does_not_swallow_unexpected_exceptions() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise RuntimeError("Unexpected failure")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(RuntimeError, match="Unexpected failure"):
+            await advise_cities(client, ["Dubai"])
+
+
+@pytest.mark.asyncio
+async def test_advise_cities_preserves_order_despite_different_completion_times() -> (
+    None
+):
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if (
+            request.url.host == "geocoding-api.open-meteo.com"
+            and request.url.params["name"] == "First"
+        ):
+            await asyncio.sleep(0.05)
+        if request.url.host == "geocoding-api.open-meteo.com":
+            city = request.url.params["name"]
+            latitude = 1 if city == "First" else 2
+            return httpx.Response(
+                200,
+                json={
+                    "results": [{"name": city, "latitude": latitude, "longitude": 1}]
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "current": {
+                    "temperature_2m": 20,
+                    "wind_speed_10m": 10,
+                    "wind_gusts_10m": 10,
+                    "precipitation": 0,
+                    "weather_code": 3,
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        results = await advise_cities(client, ["First", "Second"])
+
+    assert [result.city for result in results] == ["First", "Second"]
 
 
 def test_format_report_for_low_risk_city() -> None:
@@ -149,4 +257,27 @@ def test_format_report_for_mixed_results() -> None:
         "CITY                 RISK     DETAILS\n"
         "Dubai                LOW      -\n"
         "Offline              -        ERROR: Weather service request failed"
+    )
+
+
+def test_format_report_for_no_results_has_only_a_header() -> None:
+    assert format_report([]) == "CITY                 RISK     DETAILS"
+
+
+def test_format_report_keeps_long_city_names_in_full() -> None:
+    report = format_report(
+        [
+            CityResult(
+                city="VeryLongCityNameBeyondTwenty",
+                advisory=Advisory(
+                    city="VeryLongCityNameBeyondTwenty",
+                    risk=RiskLevel.LOW,
+                    reasons=[],
+                ),
+            )
+        ]
+    )
+
+    assert report == (
+        "CITY                 RISK     DETAILS\nVeryLongCityNameBeyondTwenty LOW      -"
     )
