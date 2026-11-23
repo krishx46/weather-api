@@ -124,3 +124,13 @@ name = "Models are a leaf layer"
 type = "forbidden"
 source_modules = ["weather_api.models"]
 forbidden_modules = ["weather_api.client", "weather_api.adviser"]
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+containers = ["weather_api"]
+layers = [
+    "service",
+    "client | adviser",
+    "models",
+]
