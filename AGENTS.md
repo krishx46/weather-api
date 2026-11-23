@@ -36,11 +36,13 @@ This project uses **uv**. The environment lives in `.venv` and is pinned by `uv.
 ```
 src/weather_api/
 ├── __init__.py
-├── models.py      # Pydantic schemas only. Imports nothing from client or adviser.
+├── models.py      # Pydantic schemas only. Imports nothing from client, adviser or service.
 ├── client.py      # Async httpx network calls only. No decision logic.
-└── adviser.py     # Flight risk decision logic only. Never imports client.
+├── adviser.py     # Flight risk decision logic only. Never imports client.
+└── service.py     # Orchestration and report formatting. Imports client, adviser, models. No printing.
 tests/             # Automated tests
-scripts/           # Runtime verification scripts (printing allowed here)
+scripts/
+└── advise.py      # CLI entry point (printing allowed here). Calls service only.
 ```
 
 Boundaries are enforced by `lint-imports`. Put new logic in the module whose single responsibility it matches.
