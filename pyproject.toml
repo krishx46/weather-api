@@ -19,6 +19,7 @@ dev = [
     "hypothesis",
     "import-linter",
     "pre-commit",
+    "mutmut>=3.8.1",
 ]
 
 [build-system]
@@ -134,3 +135,7 @@ layers = [
     "client | adviser",
     "models",
 ]
+
+[tool.mutmut]
+paths_to_mutate = ["src/"]
+pytest_add_cli_args_test_selection = ["tests/"]
