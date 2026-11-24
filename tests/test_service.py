@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from weather_api.models import Advisory, RiskLevel
-from weather_api.service import CityResult, advise_cities, format_report
+from weather_api.service import CityResult, advise_cities, format_report, has_errors
 
 
 @pytest.mark.asyncio
@@ -300,3 +300,37 @@ def test_format_report_keeps_long_city_names_in_full() -> None:
     assert report == (
         "CITY                 RISK     DETAILS\nVeryLongCityNameBeyondTwenty LOW      -"
     )
+
+
+def test_has_errors_returns_false_for_an_empty_list() -> None:
+    assert has_errors([]) is False
+
+
+def test_has_errors_returns_false_for_successful_results() -> None:
+    results = [
+        CityResult(
+            city="Dubai",
+            advisory=Advisory(city="Dubai", risk=RiskLevel.LOW, reasons=[]),
+        )
+    ]
+
+    assert has_errors(results) is False
+
+
+def test_has_errors_returns_true_for_a_single_error() -> None:
+    assert (
+        has_errors([CityResult(city="Missing", error="City not found: Missing")])
+        is True
+    )
+
+
+def test_has_errors_returns_true_for_mixed_results() -> None:
+    results = [
+        CityResult(
+            city="Dubai",
+            advisory=Advisory(city="Dubai", risk=RiskLevel.LOW, reasons=[]),
+        ),
+        CityResult(city="Missing", error="City not found: Missing"),
+    ]
+
+    assert has_errors(results) is True

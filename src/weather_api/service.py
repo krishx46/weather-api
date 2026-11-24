@@ -37,6 +37,10 @@ async def advise_cities(
     return list(await asyncio.gather(*(advise_city(client, city) for city in cities)))
 
 
+def has_errors(results: list[CityResult]) -> bool:
+    return any(result.error is not None for result in results)
+
+
 def format_report(results: list[CityResult]) -> str:
     rows = [f"{'CITY':<{CITY_WIDTH}} {'RISK':<{RISK_WIDTH}} DETAILS"]
     for result in results:

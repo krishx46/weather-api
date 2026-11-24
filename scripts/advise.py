@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from weather_api.service import CityResult, advise_cities, format_report
+from weather_api.service import CityResult, advise_cities, format_report, has_errors
 
 
 def _parse_args() -> argparse.Namespace:
@@ -23,7 +23,7 @@ def main() -> int:
     arguments = _parse_args()
     results = asyncio.run(_advise(arguments.cities))
     print(format_report(results))
-    return 1 if any(result.error is not None for result in results) else 0
+    return 1 if has_errors(results) else 0
 
 
 if __name__ == "__main__":
