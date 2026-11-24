@@ -32,3 +32,4 @@ class Advisory(BaseModel):
     city: str
     risk: RiskLevel
     reasons: list[str]
+x = 1  # noqa
