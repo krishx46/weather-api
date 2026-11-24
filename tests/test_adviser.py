@@ -55,6 +55,33 @@ def test_assess_calm_weather_is_low_risk() -> None:
     assert advisory.reasons == []
 
 
+@pytest.mark.parametrize(
+    ("overrides", "risk", "reasons"),
+    [
+        ({"wind_gust_kmh": 40}, RiskLevel.MEDIUM, ["Wind gusts: 40 km/h"]),
+        ({"wind_gust_kmh": 39.9}, RiskLevel.LOW, []),
+        (
+            {"precipitation_mm": 1},
+            RiskLevel.MEDIUM,
+            ["Precipitation: 1 mm"],
+        ),
+        ({"precipitation_mm": 0.9}, RiskLevel.LOW, []),
+        (
+            {"weather_code": 95},
+            RiskLevel.HIGH,
+            ["Thunderstorm weather code: 95"],
+        ),
+    ],
+)
+def test_assess_reasons_at_thresholds(
+    overrides: dict[str, float | int], risk: RiskLevel, reasons: list[str]
+) -> None:
+    advisory = assess("Dubai", _snapshot(**overrides))
+
+    assert advisory.risk is risk
+    assert advisory.reasons == reasons
+
+
 @given(
     temperature_c=st.floats(allow_nan=False, allow_infinity=False),
     wind_speed_kmh=st.floats(min_value=0, allow_nan=False, allow_infinity=False),

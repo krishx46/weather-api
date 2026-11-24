@@ -94,9 +94,13 @@ async def test_advise_cities_keeps_successes_when_some_cities_fail() -> None:
 def test_city_result_requires_exactly_one_outcome() -> None:
     advisory = Advisory(city="Dubai", risk=RiskLevel.LOW, reasons=[])
 
-    with pytest.raises(ValueError, match="Exactly one"):
+    with pytest.raises(
+        ValueError, match=r"^Exactly one of advisory or error must be set$"
+    ):
         CityResult(city="Dubai")
-    with pytest.raises(ValueError, match="Exactly one"):
+    with pytest.raises(
+        ValueError, match=r"^Exactly one of advisory or error must be set$"
+    ):
         CityResult(city="Dubai", advisory=advisory, error="Unavailable")
 
     assert CityResult(city="Dubai", advisory=advisory).advisory is advisory
@@ -155,6 +159,21 @@ async def test_advise_cities_does_not_swallow_unexpected_exceptions() -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(RuntimeError, match="Unexpected failure"):
             await advise_cities(client, ["Dubai"])
+
+
+@pytest.mark.asyncio
+async def test_not_found_city_keeps_its_name_and_formats_an_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": []})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        results = await advise_cities(client, ["Missing"])
+
+    assert results[0].city == "Missing"
+    assert format_report(results) == (
+        "CITY                 RISK     DETAILS\n"
+        "Missing              -        ERROR: City not found: Missing"
+    )
 
 
 @pytest.mark.asyncio
