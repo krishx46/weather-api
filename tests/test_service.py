@@ -1,10 +1,18 @@
 import asyncio
+import json
 
 import httpx
 import pytest
 
 from weather_api.models import Advisory, RiskLevel
-from weather_api.service import CityResult, advise_cities, format_report, has_errors
+from weather_api.service import (
+    CityResult,
+    advise_cities,
+    format_json,
+    format_report,
+    has_errors,
+    render,
+)
 
 
 @pytest.mark.asyncio
@@ -334,3 +342,76 @@ def test_has_errors_returns_true_for_mixed_results() -> None:
     ]
 
     assert has_errors(results) is True
+
+
+def test_format_json_for_a_low_risk_city() -> None:
+    result = CityResult(
+        city="Dubai",
+        advisory=Advisory(city="Dubai", risk=RiskLevel.LOW, reasons=[]),
+    )
+
+    assert (
+        format_json([result])
+        == """[
+  {
+    "city": "Dubai",
+    "risk": "LOW",
+    "reasons": [],
+    "error": null
+  }
+]"""
+    )
+
+
+def test_format_json_for_mixed_results() -> None:
+    results = [
+        CityResult(
+            city="London",
+            advisory=Advisory(
+                city="London",
+                risk=RiskLevel.HIGH,
+                reasons=["Wind gusts: 60 km/h", "Precipitation: 5 mm"],
+            ),
+        ),
+        CityResult(city="Missing", error="City not found: Missing"),
+    ]
+
+    assert json.loads(format_json(results)) == [
+        {
+            "city": "London",
+            "risk": "HIGH",
+            "reasons": ["Wind gusts: 60 km/h", "Precipitation: 5 mm"],
+            "error": None,
+        },
+        {
+            "city": "Missing",
+            "risk": None,
+            "reasons": [],
+            "error": "City not found: Missing",
+        },
+    ]
+
+
+def test_format_json_for_no_results() -> None:
+    assert format_json([]) == "[]"
+
+
+def test_format_json_keeps_non_ascii_city_names_unescaped() -> None:
+    result = CityResult(
+        city="Zürich",
+        advisory=Advisory(city="Zürich", risk=RiskLevel.LOW, reasons=[]),
+    )
+
+    assert "Zürich" in format_json([result])
+
+
+def test_render_uses_the_requested_output_format() -> None:
+    results = [
+        CityResult(
+            city="Dubai",
+            advisory=Advisory(city="Dubai", risk=RiskLevel.LOW, reasons=[]),
+        )
+    ]
+
+    assert render(results, as_json=True) == format_json(results)
+    assert render(results, as_json=False) == format_report(results)

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from dataclasses import dataclass
 
 import httpx
@@ -41,6 +42,28 @@ def has_errors(results: list[CityResult]) -> bool:
     return any(result.error is not None for result in results)
 
 
+def format_json(results: list[CityResult]) -> str:
+    payload = []
+    for result in results:
+        if result.advisory is None:
+            risk = None
+            reasons: list[str] = []
+            error = result.error
+        else:
+            risk = result.advisory.risk.value
+            reasons = result.advisory.reasons
+            error = None
+        payload.append(
+            {
+                "city": result.city,
+                "risk": risk,
+                "reasons": reasons,
+                "error": error,
+            }
+        )
+    return json.dumps(payload, indent=2, ensure_ascii=False)
+
+
 def format_report(results: list[CityResult]) -> str:
     rows = [f"{'CITY':<{CITY_WIDTH}} {'RISK':<{RISK_WIDTH}} DETAILS"]
     for result in results:
@@ -52,3 +75,9 @@ def format_report(results: list[CityResult]) -> str:
             risk = result.advisory.risk.value
         rows.append(f"{result.city:<{CITY_WIDTH}} {risk:<{RISK_WIDTH}} {details}")
     return "\n".join(rows)
+
+
+def render(results: list[CityResult], *, as_json: bool) -> str:
+    if as_json:
+        return format_json(results)
+    return format_report(results)

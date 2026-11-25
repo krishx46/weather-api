@@ -19,6 +19,16 @@ Dubai                LOW      -
 London               HIGH     Wind gusts: 60 km/h; Precipitation: 5 mm
 ```
 
+## JSON output
+
+```bash
+uv run python scripts/advise.py --json Dubai London
+```
+
+Each result contains `city`, `risk`, `reasons`, and `error` keys. Successful
+results include a risk and reasons with a null error; failed results use a null
+risk, empty reasons, and an error message.
+
 ## Risk rules
 
 - `HIGH`: wind gusts of at least 60 km/h, precipitation of at least 5 mm, or weather code 95, 96, or 99.
