@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from weather_api.service import CityResult, advise_cities, format_report, has_errors
+from weather_api.service import CityResult, advise_cities, has_errors, render
 
 
 def _parse_args() -> argparse.Namespace:
@@ -11,6 +11,7 @@ def _parse_args() -> argparse.Namespace:
         description="Get flight risk advisories for one or more cities."
     )
     parser.add_argument("cities", nargs="+", help="City names to assess")
+    parser.add_argument("--json", action="store_true", help="Output advisories as JSON")
     return parser.parse_args()
 
 
@@ -22,7 +23,7 @@ async def _advise(cities: list[str]) -> list[CityResult]:
 def main() -> int:
     arguments = _parse_args()
     results = asyncio.run(_advise(arguments.cities))
-    print(format_report(results))
+    print(render(results, as_json=arguments.json))
     return 1 if has_errors(results) else 0
 
 
